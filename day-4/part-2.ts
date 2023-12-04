@@ -1,3 +1,5 @@
+const wonCardCopiesCache = new Map<number, Card[]>();
+
 const input = await Bun.file("input.txt").text();
 
 const cardPile = input.split("\n").map(parseCard);
@@ -9,18 +11,26 @@ console.log(output);
 interface Card {
   winningNumbers: number[];
   cardNumbers: number[];
+  winningCardNumbers: number[];
 }
 
 function parseCard(line: string): Card {
-  const [winningNumbers, cardNumbers] = line.split(":").at(1)?.split("|") ?? [];
+  const [winningNumbersText, cardNumbersText] =
+    line.split(":").at(1)?.split("|") ?? [];
 
-  if (winningNumbers === undefined || cardNumbers === undefined) {
+  if (winningNumbersText === undefined || cardNumbersText === undefined) {
     throw new Error(`Unable to parse line: ${line}`);
   }
 
+  const winningNumbers = parseNumbers(winningNumbersText);
+  const cardNumbers = parseNumbers(cardNumbersText);
+
   return {
-    winningNumbers: parseNumbers(winningNumbers),
-    cardNumbers: parseNumbers(cardNumbers),
+    winningNumbers,
+    cardNumbers,
+    winningCardNumbers: cardNumbers.filter((cardNumber) =>
+      winningNumbers.includes(cardNumber)
+    ),
   };
 }
 
@@ -36,16 +46,22 @@ function getWonCardCopiesForCard(
   cardIndex: number,
   cardPile: Card[]
 ): Card[] {
-  const winningCardNumbers = card.cardNumbers.filter((cardNumber) =>
-    card.winningNumbers.includes(cardNumber)
-  );
+  const cachedResult = wonCardCopiesCache.get(cardIndex);
+
+  if (cachedResult) {
+    return cachedResult;
+  }
 
   const wonCardsOffset = cardIndex + 1;
   const wonCards = cardPile
-    .slice(wonCardsOffset, wonCardsOffset + winningCardNumbers.length)
+    .slice(wonCardsOffset, wonCardsOffset + card.winningCardNumbers.length)
     .flatMap((wonCard, wonCardIndex) =>
       getWonCardCopiesForCard(wonCard, wonCardsOffset + wonCardIndex, cardPile)
     );
 
-  return [card, ...wonCards];
+  const result = [card, ...wonCards];
+
+  wonCardCopiesCache.set(cardIndex, result);
+
+  return result;
 }
