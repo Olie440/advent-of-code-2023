@@ -1,0 +1,6 @@
+{
+  "dependencies": { "@types/cli-progress": "^3.11.5", "cli-progress": "^3.12.0" },
+  "devDependencies": {
+    "bun-types": "^1.0.15"
+  }
+}
