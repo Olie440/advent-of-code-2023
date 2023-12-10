@@ -3,6 +3,7 @@ type Grid = Tile[][];
 interface Tile {
   position: Position;
   type: TileType;
+  flooded: boolean;
 }
 
 interface Position {
@@ -35,6 +36,13 @@ enum Direction {
   West,
 }
 
+const ALL_DIRECTIONS = [
+  Direction.North,
+  Direction.East,
+  Direction.South,
+  Direction.West,
+];
+
 function parseGrid(gridText: string): Grid {
   return gridText.split("\n").map(parseRow);
 }
@@ -51,6 +59,7 @@ function parseTile(tileText: string, x: number, y: number): Tile {
   return {
     type: tileText as TileType,
     position: { x, y },
+    flooded: false,
   };
 }
 
@@ -58,7 +67,13 @@ function getPipe(grid: Grid): Pipe {
   const pipe = createNewPipe(grid);
 
   while (!isPipeComplete(pipe)) {
-    pipe.push(getNextSegmentInPipe(pipe, grid));
+    const nextSegment = getNextSegmentInPipe(pipe, grid);
+
+    if (nextSegment === null) {
+      break;
+    }
+
+    pipe.push(nextSegment);
   }
 
   return pipe;
@@ -73,20 +88,13 @@ function createNewPipe(grid: Grid): Pipe {
     throw new Error("Unable to find starting position");
   }
 
-  let startingDirection = Direction.North;
+  const startingDirection = ALL_DIRECTIONS.find(
+    (direction) =>
+      getNextTile(startingTile, direction, grid)?.type !== TileType.Empty
+  );
 
-  while (true) {
-    const nextTile = getNextTile(startingTile, startingDirection, grid);
-
-    if (nextTile.type !== TileType.Empty) {
-      break;
-    }
-
-    if (startingDirection === Direction.West) {
-      throw Error("Starting tile not connected to any pipe segments");
-    } else {
-      startingDirection++;
-    }
+  if (startingDirection === undefined) {
+    throw Error("Starting tile not connected to any pipe segments");
   }
 
   return [
@@ -107,13 +115,18 @@ function isPipeComplete(pipe: Pipe) {
   return lastTileType === TileType.Empty || lastTileType === TileType.Animal;
 }
 
-function getNextSegmentInPipe(pipe: Pipe, grid: Grid): PipeSegment {
+function getNextSegmentInPipe(pipe: Pipe, grid: Grid): PipeSegment | null {
   const lastSegment = pipe.at(-1) as PipeSegment;
   const nextDirection = getNextDirection(lastSegment);
+  const nextTile = getNextTile(lastSegment.tile, nextDirection, grid);
+
+  if (nextTile === undefined) {
+    return null;
+  }
 
   return {
     direction: nextDirection,
-    tile: getNextTile(lastSegment.tile, nextDirection, grid),
+    tile: nextTile,
   };
 }
 
@@ -144,27 +157,77 @@ function getNextDirection(segment: PipeSegment): Direction {
   }
 }
 
-function getNextTile(tile: Tile, direction: Direction, grid: Grid): Tile {
+function getNextTile(
+  tile: Tile,
+  direction: Direction,
+  grid: Grid
+): Tile | undefined {
   const { x, y } = tile.position;
 
-  switch (direction) {
-    case Direction.North:
-      return grid[y - 1][x];
+  try {
+    switch (direction) {
+      case Direction.North:
+        return grid[y - 1][x];
 
-    case Direction.East:
-      return grid[y][x + 1];
+      case Direction.East:
+        return grid[y][x + 1];
 
-    case Direction.South:
-      return grid[y + 1][x];
+      case Direction.South:
+        return grid[y + 1][x];
 
-    case Direction.West:
-      return grid[y][x - 1];
+      case Direction.West:
+        return grid[y][x - 1];
+    }
+  } catch {
+    return undefined;
   }
 }
 
-const input = await Bun.file("input.txt").text();
+function floodGrid(grid: Grid): Tile[] {
+  return getAllConnectedTiles(grid[0][0], grid)
+    .filter(isNotNullish)
+    .flatMap((tile) => recursivelyFloodEmptyTiles(tile, grid));
+}
+
+function getAllConnectedTiles(tile: Tile, grid: Grid): (Tile | undefined)[] {
+  return ALL_DIRECTIONS.map((direction) => getNextTile(tile, direction, grid));
+}
+
+function isNotNullish<T>(value: T): value is NonNullable<T> {
+  return value !== null && value !== undefined;
+}
+
+function recursivelyFloodEmptyTiles(tile: Tile, grid: Grid): Tile[] {
+  if (tile.type !== TileType.Empty || tile.flooded) {
+    return [];
+  }
+
+  tile.flooded = true;
+
+  return getAllConnectedTiles(tile, grid)
+    .filter(isNotNullish)
+    .flatMap((connectedTile) => recursivelyFloodEmptyTiles(connectedTile, grid))
+    .concat(tile);
+}
+
+function sortByPosition(a: Tile, b: Tile): number {
+  if (a.position.y == b.position.y) {
+    return a.position.x - b.position.x;
+  }
+
+  return a.position.y - b.position.y;
+}
+
+const input = await Bun.file("flood-step-1.txt").text();
 const grid = parseGrid(input);
 const pipe = getPipe(grid);
-const part1 = (pipe.length - 1) / 2;
 
-console.log({ part1 });
+const floodedTiles = floodGrid(grid).toSorted(sortByPosition);
+const allEmptyTiles = grid
+  .flat()
+  .filter((tile) => tile.type === TileType.Empty);
+
+const part1 = (pipe.length - 1) / 2;
+const part2 = allEmptyTiles.length - floodedTiles.length;
+
+console.log({ part1, part2 });
