@@ -1,5 +1,3 @@
-import { createDraft, finishDraft } from "immer";
-
 type Grid = Row[];
 type Row = Tile[];
 
@@ -43,12 +41,12 @@ function parseRow(rowText: string): Row {
 }
 
 function expandEmptySpace(grid: Grid, expandTo: number): Grid {
-  const gridDraft = createDraft(grid);
+  const clonedGrid = structuredClone(grid);
 
-  expandEmptyColumnsInPlace(gridDraft, expandTo);
-  expandEmptyRowsInPlace(gridDraft, expandTo);
+  expandEmptyColumnsInPlace(clonedGrid, expandTo);
+  expandEmptyRowsInPlace(clonedGrid, expandTo);
 
-  return finishDraft(gridDraft);
+  return clonedGrid;
 }
 
 function expandEmptyColumnsInPlace(grid: Grid, expandTo: number): void {
