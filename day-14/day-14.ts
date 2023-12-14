@@ -1,3 +1,5 @@
+import { CyclicalResultSet } from "./cyclical-result-set";
+
 type Grid = Tile[][];
 
 enum Tile {
@@ -118,13 +120,20 @@ function cycleGrid(grid: Grid): Grid {
 }
 
 function doPartTwo(grid: Grid): number {
+  const resultsSet = new CyclicalResultSet<Grid>();
+
   let cycledGrid = grid;
 
-  for (let _ of range(1, 1000000000)) {
+  while (true) {
     cycledGrid = cycleGrid(cycledGrid);
+    resultsSet.add(cycledGrid);
+
+    if (resultsSet.isCyclical()) {
+      break;
+    }
   }
 
-  return getGridLoad(cycledGrid);
+  return getGridLoad(resultsSet.get(1000000000 - 1));
 }
 
 const input = await Bun.file("input.txt").text();
